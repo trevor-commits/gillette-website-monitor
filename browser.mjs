@@ -80,7 +80,7 @@ try {
   writeFileSync('tmp/playwright/browser-health-process.json',JSON.stringify(record,null,2));
   writeFileSync('tmp/playwright/browser-health.json',JSON.stringify(result,null,2)+'\n');
 }
-// launchd runs a finite daily probe. A separate hosted deadline warns if the Mac/job stops.
+// The finite hosted probe reports to an independent deadline, which also detects stopped runs.
 // Only fixed public health categories leave the machine; the capability stays private.
 if(process.env.GILLETTE_BROWSER_HEARTBEAT_FILE) {
   const file=process.env.GILLETTE_BROWSER_HEARTBEAT_FILE;
