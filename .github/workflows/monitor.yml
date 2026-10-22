@@ -37,7 +37,6 @@ jobs:
     timeout-minutes: 10
     env:
       GILLETTE_PROBE_OWNER: github:trevor-commits/gillette-website-monitor
-      GILLETTE_BROWSER_HEARTBEAT_FILE: ${{ runner.temp }}/browser-ping
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -47,7 +46,10 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - name: Private heartbeat capability
-        run: node -e "require('fs').writeFileSync(process.env.GILLETTE_BROWSER_HEARTBEAT_FILE,process.env.PING_URL,{mode:0o600})"
+        run: |
+          export GILLETTE_BROWSER_HEARTBEAT_FILE="$RUNNER_TEMP/browser-ping"
+          node -e "require('fs').writeFileSync(process.env.GILLETTE_BROWSER_HEARTBEAT_FILE,process.env.PING_URL,{mode:0o600,flag:'wx'})"
+          echo "GILLETTE_BROWSER_HEARTBEAT_FILE=$GILLETTE_BROWSER_HEARTBEAT_FILE" >> "$GITHUB_ENV"
         env:
           PING_URL: ${{ secrets.HEALTHCHECKS_BROWSER_PING_URL }}
       - run: node browser.mjs
