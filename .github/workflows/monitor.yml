@@ -1,0 +1,53 @@
+name: Website monitor
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+    inputs:
+      runBrowser:
+        type: boolean
+        default: false
+      forceFailure:
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: website-monitor
+  cancel-in-progress: false
+jobs:
+  http:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+      - run: node http.mjs
+        env:
+          HEALTHCHECKS_HTTP_PING_URL: ${{ secrets.HEALTHCHECKS_HTTP_PING_URL }}
+          FORCE_FAILURE: ${{ github.event_name == 'workflow_dispatch' && inputs.forceFailure || false }}
+  browser:
+    if: github.ref == 'refs/heads/main' && (github.event.schedule == '0 18 * * *' || (github.event_name == 'workflow_dispatch' && inputs.runBrowser))
+    needs: http
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GILLETTE_PROBE_OWNER: github:trevor-commits/gillette-website-monitor
+      GILLETTE_BROWSER_HEARTBEAT_FILE: ${{ runner.temp }}/browser-ping
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Private heartbeat capability
+        run: node -e "require('fs').writeFileSync(process.env.GILLETTE_BROWSER_HEARTBEAT_FILE,process.env.PING_URL,{mode:0o600})"
+        env:
+          PING_URL: ${{ secrets.HEALTHCHECKS_BROWSER_PING_URL }}
+      - run: node browser.mjs

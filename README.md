@@ -1,0 +1,11 @@
+# Gillette website monitoring
+
+Owner: Trevor Gillette. Purpose: independent public HTTPS/readiness checks and daily non-submitting browser/dependency checks for https://gillettewsc.com. Integration target: main. Operational exit condition: verified scheduled executions and independent DOWN/UP delivery, with current recovery instructions.
+
+Standard ubuntu-latest runners in this PUBLIC repository avoid private-repository Actions minutes. No paid runner, matrix, automatic retries, deployment or customer data. HTTP checks run every fifteen minutes; browser checks daily at18:00UTC. GitHub schedules can be delayed. Independent Healthchecks deadlines detect missing runs: HTTP15minutes plus20minutes grace; browser24hours plus4hours grace. Fixed failure/success signals go to Trevor through an existing Email integration, independently of the website Worker/D1/Resend/Mac. Secret ping capabilities are stored only in Actions secrets.
+
+The HTTP probe resolves public DNS and validates public HTTPS by normal Node fetch, checks homepage content and full readiness. The browser probe checks live form JavaScript, Google address suggestions, initialized Turnstile and analytics transport; it blocks all lead POSTs and uses only labeled synthetic/public input. No CAPTCHA solving, customer record or quote email. Headless Umami bot filtering is explicitly transport-only; owner dashboard inspection still proves actual event ingestion.
+
+Manual activation can use forceFailure=true for one isolated observer failure, then a normal run for recovery. It changes only the observer signal and never production. runBrowser=true dispatches the daily browser job for verification. No pull-request workflow or untrusted code receives secrets.
+
+Inspect Actions logs, Healthchecks history, and Trevor inbox for results. Repair the code/dependency/credential issue, dispatch a normal run, and confirm provider receipt plus recovery delivery. Keep the five-minute Worker health/retry monitor as separate coverage. Disable only this workflow/check if retiring the service; preserve old incident history. Public-repository schedules can disable after60days without repository activity: the external missing-run alarm remains required. No automatic commits are used to defeat platform inactivity rules.
