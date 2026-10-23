@@ -1,0 +1,81 @@
+name: Encrypted website backup
+on:
+  schedule:
+    - cron: '40 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      forceFailure:
+        description: One controlled warning test; skips the export
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: encrypted-website-backup
+  cancel-in-progress: false
+jobs:
+  backup:
+    if: github.repository == 'trevor-commits/gillette-website-monitor' && github.ref == 'refs/heads/main' && vars.GILLETTE_BACKUP_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '26'
+      - name: Install Ubuntu rclone
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y rclone
+      - name: Prepare private backup files
+        run: |
+          node --input-type=module <<'JS'
+          import {mkdirSync,writeFileSync} from 'node:fs';
+          import {join} from 'node:path';
+          process.umask(0o077);
+          const e=process.env,root=join(e.RUNNER_TEMP,'gillette-encrypted-backup');
+          mkdirSync(root,{mode:0o700});
+          const files={'cloudflare-token':e.CF_TOKEN,'drive.conf':e.DRIVE_CONFIG,'backup.key':Buffer.from(e.KEY_BASE64||'','base64'),'heartbeat':e.PING_URL};
+          if(Object.values(files).some(x=>!x?.length)||files['backup.key'].length!==32)throw Error('Approved backup secrets required');
+          for(const [name,value] of Object.entries(files))writeFileSync(join(root,name),value,{mode:0o600,flag:'wx'});
+          writeFileSync(join(root,'config.json'),JSON.stringify({privateDirectory:root,repository:process.cwd(),owner:'github:'+e.GITHUB_REPOSITORY+'/actions/runs/'+e.GITHUB_RUN_ID,cloudflareTokenFile:join(root,'cloudflare-token'),cloudflareAccountId:e.CF_ACCOUNT,cloudflareDatabaseId:e.CF_DATABASE,driveFolderId:e.DRIVE_FOLDER,expectedEmail:'trevor@gillettewsc.com',driveRemote:'gilletteBackup',rclone:'/usr/bin/rclone',rcloneConfig:join(root,'drive.conf'),keyFile:join(root,'backup.key'),heartbeatFile:join(root,'heartbeat')}),{mode:0o600,flag:'wx'});
+          JS
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_D1_BACKUP_READ_TOKEN }}
+          DRIVE_CONFIG: ${{ secrets.GILLETTE_BACKUP_DRIVE_CONFIG }}
+          KEY_BASE64: ${{ secrets.GILLETTE_BACKUP_KEY_BASE64 }}
+          PING_URL: ${{ secrets.HEALTHCHECKS_BACKUP_PING_URL }}
+          CF_ACCOUNT: ${{ vars.GILLETTE_BACKUP_CF_ACCOUNT_ID }}
+          CF_DATABASE: ${{ vars.GILLETTE_BACKUP_D1_DATABASE_ID }}
+          DRIVE_FOLDER: ${{ vars.GILLETTE_BACKUP_DRIVE_FOLDER_ID }}
+      - name: Export, encrypt, upload and independently verify
+        run: |
+          node --input-type=module <<'JS'
+          import {backup} from './backup-leads.mjs';
+          import {join} from 'node:path';
+          if(process.env.FORCE_FAILURE==='true')throw Error('Controlled hosted backup warning test');
+          const result=await backup(join(process.env.RUNNER_TEMP,'gillette-encrypted-backup/config.json'));
+          const {ok,name,sha256,bytes,integrity,schemaCompatible,notifications,liveDatabaseModified}=result;
+          console.log(JSON.stringify({ok,name,sha256,bytes,integrity,schemaCompatible,notifications,liveDatabaseModified}));
+          JS
+        env:
+          FORCE_FAILURE: ${{ github.event_name == 'workflow_dispatch' && inputs.forceFailure || false }}
+      - name: Signal an independent failure
+        if: failure()
+        run: |
+          node --input-type=module <<'JS'
+          const ping=process.env.PING_URL;
+          if(!/^https:\/\/hc-ping\.com\/[0-9a-f-]{36}$/.test(ping||''))throw Error('Backup warning destination unavailable; missing-run deadline remains active');
+          const response=await fetch(ping+'/fail',{method:'POST',body:'hosted encrypted website backup failed',signal:AbortSignal.timeout(15000)});
+          if(!response.ok)throw Error('Backup warning rejected; missing-run deadline remains active');
+          JS
+        env:
+          PING_URL: ${{ secrets.HEALTHCHECKS_BACKUP_PING_URL }}
+      - name: Remove this run's private files
+        if: always()
+        run: |
+          node --input-type=module <<'JS'
+          import {rmSync} from 'node:fs';
+          import {join} from 'node:path';
+          rmSync(join(process.env.RUNNER_TEMP,'gillette-encrypted-backup'),{recursive:true,force:true});
+          JS
