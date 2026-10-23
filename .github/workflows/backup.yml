@@ -2,8 +2,6 @@ name: Encrypted website backup
 on:
   schedule:
     - cron: '40 */6 * * *'
-    # Temporary calendar proof; remove after its actual scheduled success.
-    - cron: '9 20 23 10 *'
   workflow_dispatch:
     inputs:
       forceFailure:
