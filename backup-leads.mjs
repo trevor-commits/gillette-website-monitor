@@ -23,33 +23,57 @@ export function expiredSnapshots(files,now=Date.now()){
   return files.filter(f=>/^leads-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z\.gwsc$/.test(f.Name)
     && Date.parse(f.Name.slice(6,-5).replace(/T(\d{2})-(\d{2})-(\d{2})Z$/,'T$1:$2:$3Z'))<now-30*86400000);
 }
+export const d1SchemaSql="SELECT m.name,m.type,m.sql,(SELECT json_group_array(name) FROM pragma_table_info(m.name)) AS columns FROM sqlite_schema m WHERE (m.name NOT GLOB 'sqlite_*' OR m.name='sqlite_sequence') AND m.name NOT GLOB '_cf_*' AND m.sql IS NOT NULL ORDER BY m.type,m.name";
+const literal=value=>"'"+value.replaceAll("'","''")+"'";
+const identifier=value=>'"'+value.replaceAll('"','""')+'"';
+export function d1SnapshotSql(schema){
+  // The discovery read only builds identifiers. Schema, counts and all data below
+  // are fetched in ONE SELECT, so concurrent writes cannot mix table snapshots.
+  const tables=[];
+  for(const table of schema.filter(x=>x.type==='table')){
+    const columns=JSON.parse(table.columns);if(!columns.length||columns.some(x=>typeof x!=='string'))throw Error('Invalid D1 schema');
+    const target=identifier(table.name),name=literal(table.name);
+    // Hex text preserves embedded NULs and Unicode; SQLite quote preserves
+    // integer precision, NULL, real and blob literals without a JS conversion.
+    const cells=columns.map(identifier).map(c=>`CASE typeof(${c}) WHEN 'text' THEN 'CAST(X'''||hex(${c})||''' AS TEXT)' ELSE quote(${c}) END`);
+    const row=literal(`INSERT INTO ${target} (${columns.map(identifier).join(',')}) VALUES (`)+"||"+cells.join("||','||")+"||');'";
+    tables.push(name,`json_object('count',(SELECT CAST(count(*) AS TEXT) FROM ${target}),'rows',json((SELECT json_group_array(${row}) FROM ${target})))`);
+  }
+  const sql=`SELECT json_object('schema',json((SELECT json_group_array(json_object('name',m.name,'type',m.type,'sql',m.sql,'columns',m.columns)) FROM (${d1SchemaSql}) m)),'tables',json_object(${tables.join(',')})) AS snapshot`;
+  // ponytail: one bounded read snapshot; upgrade when JSON approaches 1.5 MiB
+  // or the query reaches 100 KB. Failure warns and retains the prior good copy.
+  if(Buffer.byteLength(sql)>100000)throw Error('D1 snapshot query exceeds reviewed 100 KB limit');
+  return sql;
+}
 export async function exportD1Sql(accountId,databaseId,token){
   if(!/^[a-f0-9]{32}$/.test(accountId)||!/^[-a-f0-9]{36}$/.test(databaseId)||!token.trim())throw Error('Invalid D1 export configuration');
-  const deadline=AbortSignal.timeout(180000);
-  let bookmark;
-  for(let attempt=0;attempt<20;attempt++){
+  const query=async sql=>{
     let response;
-    try{response=await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}/export`,{method:'POST',redirect:'error',headers:{authorization:'Bearer '+token.trim(),'content-type':'application/json'},body:JSON.stringify({output_format:'polling',dump_options:{no_schema:false,no_data:false,tables:[]},current_bookmark:bookmark}),signal:AbortSignal.any([deadline,AbortSignal.timeout(15000)])});}
-    catch{throw Error('D1 export request failed');}
-    const body=await response.json(),state=body.result;
-    if(!response.ok||!body.success||!state?.success)throw Error('D1 export rejected');
-    if(state.status==='complete'){
-      const url=new URL(state.result?.signed_url);
-      if(url.protocol!=='https:'||!url.hostname.endsWith('.r2.cloudflarestorage.com')||url.username||url.password)throw Error('Invalid D1 download destination');
-      let download;
-      try{download=await fetch(url,{redirect:'error',signal:AbortSignal.any([deadline,AbortSignal.timeout(30000)])});}
-      catch{throw Error('D1 backup download failed');}
-      if(!download.ok||!download.body)throw Error('D1 backup download rejected');
-      const chunks=[];let size=0;
-      for await(const chunk of download.body){size+=chunk.length;if(size>64*1024*1024)throw Error('D1 export exceeds reviewed 64 MiB limit');chunks.push(chunk);}
-      if(!size)throw Error('D1 export is empty');
-      return Buffer.concat(chunks);
-    }
-    if(state.status!=='active'||!state.at_bookmark)throw Error('Invalid D1 export progress');
-    bookmark=state.at_bookmark;
-    await new Promise(resolve=>setTimeout(resolve,250));
+    try{response=await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}/query`,{method:'POST',redirect:'error',headers:{authorization:'Bearer '+token.trim(),'content-type':'application/json'},body:JSON.stringify({sql,params:[]}),signal:AbortSignal.timeout(30000)});}
+    catch{throw Error('D1 read request failed');}
+    if(!response.ok||!response.body)throw Error('D1 read rejected');
+    const chunks=[];let size=0;
+    for await(const chunk of response.body){size+=chunk.length;if(size>64*1024*1024)throw Error('D1 read exceeds reviewed 64 MiB limit');chunks.push(chunk);}
+    let body;try{body=JSON.parse(Buffer.concat(chunks).toString());}catch{throw Error('Invalid D1 read response');}
+    if(!body.success||body.result?.length!==1||!body.result[0].success||!Array.isArray(body.result[0].results))throw Error('D1 read rejected');
+    return body.result[0].results;
+  };
+  const schema=await query(d1SchemaSql);if(!schema.some(x=>x.type==='table'))throw Error('D1 schema missing');
+  const rows=await query(d1SnapshotSql(schema));
+  if(rows.length!==1||typeof rows[0].snapshot!=='string'||Buffer.byteLength(rows[0].snapshot)>1.5*1024*1024)throw Error('D1 snapshot exceeds reviewed 1.5 MiB limit or is incomplete');
+  const snapshot=JSON.parse(rows[0].snapshot);
+  const canonical=items=>JSON.stringify(items.map(({name,type,sql,columns})=>({name,type,sql,columns})).sort((a,b)=>a.name.localeCompare(b.name)));
+  if(canonical(snapshot.schema)!==canonical(schema))throw Error('D1 schema changed during backup');
+  if(Object.keys(snapshot.tables).length!==schema.filter(x=>x.type==='table').length)throw Error('Incomplete D1 snapshot');
+  const inserts=[];let sequences=[];
+  for(const table of schema.filter(x=>x.type==='table')){
+    const result=snapshot.tables[table.name],data=result?.rows;
+    if(!Array.isArray(data)||data.some(x=>typeof x!=='string')||result.count!==String(data.length))throw Error('D1 snapshot row count mismatch');
+    if(table.name==='sqlite_sequence')sequences=['DELETE FROM sqlite_sequence;',...data];else inserts.push(...data);
   }
-  throw Error('D1 export polling limit reached');
+  const tables=schema.filter(x=>x.type==='table'&&x.name!=='sqlite_sequence').map(x=>x.sql+';');
+  const remaining=schema.filter(x=>x.type!=='table').map(x=>x.sql+';');
+  return Buffer.from(['PRAGMA defer_foreign_keys=TRUE;',...tables,...inserts,...sequences,...remaining,''].join('\n'));
 }
 function privateRead(path){
   const s=statSync(path);if(!s.isFile()||(s.mode&0o077))throw Error('Private file permissions required');
@@ -60,6 +84,7 @@ const restorePython=`import sqlite3,sys,json
 db=sqlite3.connect(':memory:')
 db.executescript(open(sys.argv[1]).read())
 assert db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+assert db.execute('PRAGMA foreign_key_check').fetchone() is None
 for t in ['leads','monitor_alerts']: db.execute('SELECT count(*) FROM '+t).fetchone()
 assert {'client_uuid','tracking_id','payload'}.issubset({r[1] for r in db.execute('PRAGMA table_info(leads)')})
 print(json.dumps({'integrity':'ok','leadRows':db.execute('SELECT count(*) FROM leads').fetchone()[0],'schemaCompatible':True}))`;
