@@ -2,7 +2,7 @@ name: Website monitor
 on:
   schedule:
     - cron: '7,22,37,52 * * * *'
-    - cron: '7 18 * * *'
+    - cron: '11 */6 * * *'
   workflow_dispatch:
     inputs:
       runBrowser:
@@ -31,7 +31,7 @@ jobs:
           HEALTHCHECKS_HTTP_PING_URL: ${{ secrets.HEALTHCHECKS_HTTP_PING_URL }}
           FORCE_FAILURE: ${{ github.event_name == 'workflow_dispatch' && inputs.forceFailure || false }}
   browser:
-    if: github.ref == 'refs/heads/main' && (github.event.schedule == '7 18 * * *' || (github.event_name == 'workflow_dispatch' && inputs.runBrowser))
+    if: github.ref == 'refs/heads/main' && (github.event.schedule == '11 */6 * * *' || (github.event_name == 'workflow_dispatch' && inputs.runBrowser))
     needs: http
     runs-on: ubuntu-latest
     timeout-minutes: 10
