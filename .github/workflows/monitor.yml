@@ -1,14 +1,10 @@
-name: Website monitor
+name: Website browser monitor
 on:
   schedule:
-    - cron: '7,22,37,52 * * * *'
     - cron: '11 */6 * * *'
   workflow_dispatch:
     inputs:
       runBrowser:
-        type: boolean
-        default: false
-      forceFailure:
         type: boolean
         default: false
 permissions:
@@ -17,22 +13,8 @@ concurrency:
   group: website-monitor
   cancel-in-progress: false
 jobs:
-  http:
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    timeout-minutes: 3
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '26'
-      - run: node http.mjs
-        env:
-          HEALTHCHECKS_HTTP_PING_URL: ${{ secrets.HEALTHCHECKS_HTTP_PING_URL }}
-          FORCE_FAILURE: ${{ github.event_name == 'workflow_dispatch' && inputs.forceFailure || false }}
   browser:
     if: github.ref == 'refs/heads/main' && (github.event.schedule == '11 */6 * * *' || (github.event_name == 'workflow_dispatch' && inputs.runBrowser))
-    needs: http
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
