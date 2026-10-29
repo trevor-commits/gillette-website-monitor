@@ -1,6 +1,6 @@
 # Scheduled workflow clock repair
 
-Owner: Codex `01a17233-b6ab-7603-b2f4-c7a506aa44da`. Integration target: main. Reused clean checkout at `a618915`; no branch or worktree created.
+Owner: Codex `01a17233-b6ab-7603-b2f4-c7a506aa44da`. Integration target: main. Reused clean checkout at `a618915`. No branch or worktree created.
 
 Trevor requested a cause-level repair on October 29. The backup scheduled for October 28 at 18:40 UTC was created at 22:49:49 UTC. Its runner started two seconds later and completed at 22:50:18 UTC. The delay preceded runner allocation and backup execution.
 
@@ -14,7 +14,7 @@ Sources: [observed run](https://github.com/trevor-commits/gillette-website-monit
 
 The clock has no public endpoint or access to lead records, recovery keys or Drive credentials. It uses one repository-scoped GitHub Actions credential. No new dependency, paid plan, browser runner or model schedule is required.
 
-The clock identifies each scheduled slot in the workflow title and skips observed duplicate slots. Concurrent duplicate cron deliveries can still race. Existing workflow concurrency prevents overlapping job execution; exact-once dispatch is not claimed. An ambiguous dispatch is never blindly retried.
+The clock identifies each scheduled slot in the workflow title and skips observed duplicate slots. Concurrent duplicate cron deliveries can still race. Existing workflow concurrency prevents overlapping job execution. Exact-once dispatch is not claimed. An ambiguous dispatch is never blindly retried.
 
 `GILLETTE_CLOCK_SOURCE=cloudflare` disables only the old schedule-triggered jobs. Manual dispatch remains available. Until that variable is set, the existing GitHub schedules continue unchanged.
 
