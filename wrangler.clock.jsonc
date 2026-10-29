@@ -1,0 +1,11 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "gillette-workflow-clock",
+  "main": "workflow-clock.mjs",
+  "account_id": "41419643472b95643aed171deab1422f",
+  "compatibility_date": "2026-10-29",
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": {"enabled": true},
+  "triggers": {"crons": ["11 */6 * * *", "40 */6 * * *"]}
+}

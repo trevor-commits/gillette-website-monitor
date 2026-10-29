@@ -1,9 +1,14 @@
 name: Website browser monitor
+run-name: ${{ inputs.clockSlot && format('Website browser monitor — clock {0}', inputs.clockSlot) || 'Website browser monitor' }}
 on:
   schedule:
     - cron: '11 */6 * * *'
   workflow_dispatch:
     inputs:
+      clockSlot:
+        description: UTC scheduled instant supplied by the external clock
+        type: string
+        default: ''
       runBrowser:
         type: boolean
         default: false
@@ -14,7 +19,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   browser:
-    if: github.ref == 'refs/heads/main' && (github.event.schedule == '11 */6 * * *' || (github.event_name == 'workflow_dispatch' && inputs.runBrowser))
+    if: github.ref == 'refs/heads/main' && ((github.event.schedule == '11 */6 * * *' && vars.GILLETTE_CLOCK_SOURCE != 'cloudflare') || (github.event_name == 'workflow_dispatch' && inputs.runBrowser))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:

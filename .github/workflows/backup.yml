@@ -1,9 +1,14 @@
 name: Encrypted website backup
+run-name: ${{ inputs.clockSlot && format('Encrypted website backup — clock {0}', inputs.clockSlot) || 'Encrypted website backup' }}
 on:
   schedule:
     - cron: '40 */6 * * *'
   workflow_dispatch:
     inputs:
+      clockSlot:
+        description: UTC scheduled instant supplied by the external clock
+        type: string
+        default: ''
       forceFailure:
         description: One controlled warning test; skips the export
         type: boolean
@@ -15,7 +20,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   backup:
-    if: github.repository == 'trevor-commits/gillette-website-monitor' && github.ref == 'refs/heads/main' && vars.GILLETTE_BACKUP_ENABLED == 'true'
+    if: github.repository == 'trevor-commits/gillette-website-monitor' && github.ref == 'refs/heads/main' && vars.GILLETTE_BACKUP_ENABLED == 'true' && (github.event_name != 'schedule' || vars.GILLETTE_CLOCK_SOURCE != 'cloudflare')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
