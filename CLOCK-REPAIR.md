@@ -20,7 +20,11 @@ The clock identifies each scheduled slot in the workflow title and skips observe
 
 ## Activation and acceptance
 
-Current state: prepared and locally tested, not deployed or activated. Six focused tests pass. No dispatch token was created or copied.
+Current state: deployed and activated October 29 at 18:25 UTC; natural calendar acceptance remains pending. Six focused tests pass. Trevor approved the scoped credential and activation in the owning thread.
+
+The token `gillette-workflow-clock-20261029` (GitHub ID 22036544) expires January 27, 2027. Its sole selected repository is this companion; permissions are Actions read/write and required Metadata read, with no user permissions. Its value is stored only as the Cloudflare `GITHUB_ACTIONS_TOKEN` secret. Existing monthly care must renew it before expiry and verify the next scheduled output.
+
+Cloudflare version `47950b6e-00a5-4f81-8d81-cd6e1287eeb9` serves 100% and both original cron expressions are read back. Repository variable `GILLETTE_CLOCK_SOURCE=cloudflare` is read back. Worker public/preview URLs remain disabled. The staged remote-preview test returned HTTP 403 before dispatch and supplies no acceptance proof. Existing workflow definitions and independent absence alarms remain intact; restore GitHub schedule ownership if the clock fails its next useful opportunity.
 
 1. Approve a fine-grained token for only `trevor-commits/gillette-website-monitor`, with Actions read/write and required Metadata read. Use a 90-day expiry and record its renewal date. Store it only as `GITHUB_ACTIONS_TOKEN` in the dedicated Cloudflare Worker. Do not use the broad personal CLI token.
 2. Verify the business Cloudflare account and deploy with `wrangler.clock.jsonc`. Keep the next calendar opportunity far enough away to complete cutover without overlapping ownership.
