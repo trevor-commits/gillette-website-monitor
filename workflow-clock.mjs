@@ -14,13 +14,15 @@ export async function dispatchScheduled(event,env,fetcher=fetch) {
   const base=`https://api.github.com/repos/${repository}/actions/workflows/${job.workflow}`;
   // Avoid replaying an already-observed slot. Never retry an ambiguous dispatch.
   // ponytail: simultaneous duplicate cron deliveries can race; add durable claims if a duplicate slot is observed.
-  const prior=await fetcher(base+'/runs?event=workflow_dispatch&branch=main&per_page=20',{headers,redirect:'error',signal:AbortSignal.timeout(10000)});
+  // Workers supports follow/manual only. Manual plus the status checks below rejects
+  // redirects without forwarding the repository credential to another destination.
+  const prior=await fetcher(base+'/runs?event=workflow_dispatch&branch=main&per_page=20',{headers,redirect:'manual',signal:AbortSignal.timeout(10000)});
   if(!prior.ok)throw Error(`Workflow inventory rejected: ${prior.status}`);
   const data=await prior.json();
   if(!Array.isArray(data.workflow_runs))throw Error('Invalid workflow inventory');
   const title=`${job.title} — clock ${clockSlot}`;
   if(data.workflow_runs.some(run=>run.display_title===title))return {workflow:job.workflow,clockSlot,state:'already-dispatched'};
-  const response=await fetcher(base+'/dispatches',{method:'POST',headers,redirect:'error',body:JSON.stringify({ref:'main',inputs:{...job.inputs,clockSlot}}),signal:AbortSignal.timeout(10000)});
+  const response=await fetcher(base+'/dispatches',{method:'POST',headers,redirect:'manual',body:JSON.stringify({ref:'main',inputs:{...job.inputs,clockSlot}}),signal:AbortSignal.timeout(10000)});
   if(!response.ok)throw Error(`Workflow dispatch rejected: ${response.status}`);
   return {workflow:job.workflow,clockSlot,state:'dispatched'};
 }

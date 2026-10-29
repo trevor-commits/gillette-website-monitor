@@ -13,7 +13,7 @@ for(const [cron,workflow,inputs] of [['40 */6 * * *','backup.yml',{}],['11 */6 *
     assert.equal(result.state,'dispatched');assert.equal(calls.length,2);
     assert.equal(calls[1].url,`https://api.github.com/repos/trevor-commits/gillette-website-monitor/actions/workflows/${workflow}/dispatches`);
     assert.deepEqual(JSON.parse(calls[1].options.body),{ref:'main',inputs:{...inputs,clockSlot:new Date(time).toISOString()}});
-    assert.equal(calls[1].options.redirect,'error');
+    assert.ok(calls.every(call=>call.options.redirect==='manual'));
   });
 }
 test('known slot does not dispatch again',async()=>{
@@ -31,7 +31,7 @@ test('rejects unknown schedules and absent credentials before network access',as
   assert.equal(worker.fetch().status,404);
 });
 test('inventory failures fail closed',async()=>{
-  for(const response of [new Response('',{status:403}),Response.json({})]) {
+  for(const response of [new Response('',{status:403}),new Response(null,{status:302,headers:{location:'https://untrusted.invalid'}}),Response.json({})]) {
     let calls=0;
     await assert.rejects(dispatchScheduled({cron:'40 */6 * * *',scheduledTime:time},env,async()=>{calls++;return response;}));
     assert.equal(calls,1);
@@ -47,4 +47,14 @@ test('failed or ambiguous dispatch is not retried',async()=>{
     }));
     assert.equal(calls,2);
   }
+});
+
+test('dispatch redirects are rejected without forwarding the credential',async()=>{
+  let calls=0;
+  await assert.rejects(dispatchScheduled({cron:'40 */6 * * *',scheduledTime:time},env,async(url,options)=>{
+    assert.equal(options.redirect,'manual');assert.ok(url.startsWith('https://api.github.com/'));
+    if(++calls===1)return Response.json({workflow_runs:[]});
+    return new Response(null,{status:307,headers:{location:'https://untrusted.invalid'}});
+  }),/dispatch rejected: 307/);
+  assert.equal(calls,2);
 });

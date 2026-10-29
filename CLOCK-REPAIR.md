@@ -20,6 +20,10 @@ The clock identifies each scheduled slot in the workflow title and skips observe
 
 ## Activation and acceptance
 
+October29 first-slot repair: the 18:40:22UTC Cloudflare invocation threw before any subrequest. Detailed logs report `Invalid redirect value, must be one of "follow" or "manual"`; Workers does not implement `redirect: "error"`. Both requests now use `manual`, and their existing HTTP status checks reject redirects without forwarding the credential. Seven unit tests cover dispatch, deduplication, unknown schedules, missing credentials, inventory errors, ambiguous dispatch and rejected redirects. A real local Workers runtime fixture reproduced zero-request failure with old source, two-request successful dispatch with fixed source, and one-request rejection of a redirect. The installed workerd supports compatibility date2026-10-13; production retains2026-10-29. Node mocks alone had missed the runtime restriction.
+
+The missed backup is replayed once through the existing manual workflow to preserve recovery coverage. That replay is not natural clock proof. Require subsequent real Cloudflare browser00:11UTC and backup00:40UTC executions before retiring the retained GitHub schedule definitions. The independent eight-hour backup deadline remains unchanged.
+
 Current state: deployed and activated October 29 at 18:25 UTC; natural calendar acceptance remains pending. Six focused tests pass. Trevor approved the scoped credential and activation in the owning thread.
 
 The token `gillette-workflow-clock-20261029` (GitHub ID 22036544) expires January 27, 2027. Its sole selected repository is this companion; permissions are Actions read/write and required Metadata read, with no user permissions. Its value is stored only as the Cloudflare `GITHUB_ACTIONS_TOKEN` secret. Existing monthly care must renew it before expiry and verify the next scheduled output.
