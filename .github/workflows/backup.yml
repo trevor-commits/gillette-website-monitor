@@ -1,8 +1,6 @@
 name: Encrypted website backup
 run-name: ${{ inputs.clockSlot && format('Encrypted website backup — clock {0}', inputs.clockSlot) || 'Encrypted website backup' }}
 on:
-  schedule:
-    - cron: '40 */6 * * *'
   workflow_dispatch:
     inputs:
       clockSlot:

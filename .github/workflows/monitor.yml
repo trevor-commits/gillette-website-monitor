@@ -1,8 +1,6 @@
 name: Website browser monitor
 run-name: ${{ inputs.clockSlot && format('Website browser monitor — clock {0}', inputs.clockSlot) || 'Website browser monitor' }}
 on:
-  schedule:
-    - cron: '11 */6 * * *'
   workflow_dispatch:
     inputs:
       clockSlot:

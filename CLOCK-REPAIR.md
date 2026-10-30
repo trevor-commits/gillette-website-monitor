@@ -8,7 +8,7 @@ GitHub documents that scheduled events can be delayed or dropped under load. Bot
 
 Sources: [observed run](https://github.com/trevor-commits/gillette-website-monitor/actions/runs/40782917030), [GitHub scheduling limitations](https://docs.github.com/en/actions/how-tos/troubleshoot-workflows), [workflow dispatch API](https://docs.github.com/en/rest/actions/workflows#create-a-workflow-dispatch-event).
 
-## Prepared change
+## Implemented change
 
 `workflow-clock.mjs` lets Cloudflare Cron Triggers dispatch the existing browser and backup workflows at their existing six-hour times. It bypasses GitHub's delayed schedule-event creation. The jobs, private backup processing, encryption, Drive destination, retention and independent alerts stay intact.
 
@@ -16,15 +16,15 @@ The clock has no public endpoint or access to lead records, recovery keys or Dri
 
 The clock identifies each scheduled slot in the workflow title and skips observed duplicate slots. Concurrent duplicate cron deliveries can still race. Existing workflow concurrency prevents overlapping job execution. Exact-once dispatch is not claimed. An ambiguous dispatch is never blindly retried.
 
-`GILLETTE_CLOCK_SOURCE=cloudflare` disables only the old schedule-triggered jobs. Manual dispatch remains available. Until that variable is set, the existing GitHub schedules continue unchanged.
+`GILLETTE_CLOCK_SOURCE=cloudflare` gated the delayed old schedule jobs during cutover. Both obsolete GitHub cron entries are now removed after natural acceptance. Manual dispatch, inputs, concurrency, timeouts and job steps remain byte-for-byte unchanged. The ownership variable and guards remain available for rollback.
 
 ## Activation and acceptance
 
 October29 first-slot repair: the 18:40:22UTC Cloudflare invocation threw before any subrequest. Detailed logs report `Invalid redirect value, must be one of "follow" or "manual"`; Workers does not implement `redirect: "error"`. Both requests now use `manual`, and their existing HTTP status checks reject redirects without forwarding the credential. Seven unit tests cover dispatch, deduplication, unknown schedules, missing credentials, inventory errors, ambiguous dispatch and rejected redirects. A real local Workers runtime fixture reproduced zero-request failure with old source, two-request successful dispatch with fixed source, and one-request rejection of a redirect. The installed workerd supports compatibility date2026-10-13; production retains2026-10-29. Node mocks alone had missed the runtime restriction.
 
-The missed backup is replayed once through the existing manual workflow to preserve recovery coverage. That replay is not natural clock proof. Require subsequent real Cloudflare browser00:11UTC and backup00:40UTC executions before retiring the retained GitHub schedule definitions. The independent eight-hour backup deadline remains unchanged.
+The missed first backup was replayed once through the existing manual workflow. Its receipt remains historical recovery evidence, separate from the natural calendar proof below. The independent eight-hour backup deadline remains unchanged.
 
-Current state: redirect repair deployed October 29 at 18:50 UTC; natural calendar acceptance remains pending. Seven focused tests pass. Trevor approved the scoped credential and activation in the owning thread.
+Current state: both natural calendar runs verified on October 29 Pacific time; obsolete GitHub cron entries retired. Seven focused tests pass. Trevor approved the scoped credential and activation in the owning thread.
 
 The token `gillette-workflow-clock-20261029` (GitHub ID 22036544) expires January 27, 2027. Its sole selected repository is this companion; permissions are Actions read/write and required Metadata read, with no user permissions. Its value is stored only as the Cloudflare `GITHUB_ACTIONS_TOKEN` secret. Existing monthly care must renew it before expiry and verify the next scheduled output.
 
@@ -32,15 +32,19 @@ Cloudflare version `542798cd-a420-4953-969c-3246b97fa959` serves 100%; both orig
 
 The corrected remote Workers preview dispatched browser run [40934642018](https://github.com/trevor-commits/gillette-website-monitor/actions/runs/40934642018) at 18:50:55 UTC. Its 18:51:26 browser result has zero failures, zero lead POSTs, readiness 200 and independent heartbeat accepted. The previous local preview 403 was not production evidence; bounded curl with proxy bypass completed HTTP 200, and the owned preview process was reaped.
 
-Manual backup recovery [40934478526](https://github.com/trevor-commits/gillette-website-monitor/actions/runs/40934478526) verified at 18:50:20 UTC: integrity ok, schema compatible, 6,835 encrypted bytes, no notifications and no live database modification. Its next absence deadline is approximately 02:50 UTC October 30. Neither manual result proves calendar timing. Require natural browser 00:11 UTC and backup 00:40 UTC October 30 before removing the retained GitHub schedule definitions. Restore schedule ownership if the replacement fails again and cannot be repaired before its absence deadline.
+Manual backup recovery [40934478526](https://github.com/trevor-commits/gillette-website-monitor/actions/runs/40934478526) verified at 18:50:20 UTC: integrity ok, schema compatible, 6,835 encrypted bytes, no notifications and no live database modification. Its next absence deadline is approximately 02:50 UTC October 30. Neither manual result proves calendar timing. Both natural runs subsequently succeeded, as recorded below. Restore schedule ownership if the replacement fails again and cannot be repaired before its absence deadline.
 
-1. Approve a fine-grained token for only `trevor-commits/gillette-website-monitor`, with Actions read/write and required Metadata read. Use a 90-day expiry and record its renewal date. Store it only as `GITHUB_ACTIONS_TOKEN` in the dedicated Cloudflare Worker. Do not use the broad personal CLI token.
-2. Verify the business Cloudflare account and deploy with `wrangler.clock.jsonc`. Keep the next calendar opportunity far enough away to complete cutover without overlapping ownership.
-3. Run a bounded dispatch acceptance with the approved credential. Verify the exact workflow run, execution result and independent heartbeat. A request accepted by GitHub is not completed job proof.
-4. Set `GILLETTE_CLOCK_SOURCE=cloudflare` once dispatch acceptance passes. Read back the repository variable and both live Cron Triggers.
-5. Require an actual Cloudflare calendar dispatch for each job. Bind the scheduled slot, dispatch timestamp, GitHub run and successful output. Preserve the eight-hour backup and 28-hour browser absence deadlines.
-6. Only after natural proof, remove the obsolete GitHub schedule entries and update the operating record. Keep manual dispatch and rollback instructions.
+## Natural calendar acceptance
 
-Recovery: unset `GILLETTE_CLOCK_SOURCE` and remove the clock's triggers to restore the retained GitHub scheduler. Revoke the dedicated credential when the clock is retired. Preserve backup keys, prior copies and incident history.
+| Job | Clock invocation (UTC) | GitHub run | Verified output |
+| --- | --- | --- | --- |
+| Browser | `2026-10-30T00:11:07Z`; success, one request/two subrequests, zero errors | [40978071467](https://github.com/trevor-commits/gillette-website-monitor/actions/runs/40978071467), created `00:11:11Z`, completed `00:11:54Z` | Checked `00:11:45.070Z`; zero failures/lead POSTs, readiness200, independent heartbeat accepted |
+| Backup | `2026-10-30T00:40:22Z`; success, one request/two subrequests, zero errors | [40981153890](https://github.com/trevor-commits/gillette-website-monitor/actions/runs/40981153890), created `00:40:25Z`, completed `00:40:53Z` | Verified `00:40:50Z`; integrity ok, schema compatible, 6,836 encrypted bytes, no notifications/live database modification |
+
+The run titles bind clock slots `2026-10-30T00:11:07.746Z` and `2026-10-30T00:40:22.242Z`. Both jobs ran source `313ba9165d122e2d8cdf0be1d3486bc045648d9f`. Backup `ok:true` is returned only after the independent heartbeat succeeds, verified against the executed source. Its absence deadline advances to approximately `2026-10-30T08:40:50Z`. These are natural executions, not manual acceptance dispatches.
+
+The two GitHub `schedule` blocks are retired in this change. The existing Cloudflare cron expressions remain the sole calendar source. Better Stack, site Worker cron, independent missing-output alarms, encrypted backup handling and monthly care are preserved. No manual run was triggered to claim acceptance.
+
+Recovery: restore only the two original `schedule` blocks from commit `313ba91` while `GILLETTE_CLOCK_SOURCE=cloudflare` still gates them. Publish through normal checks. At a controlled cutover, remove the clock's triggers and unset the ownership variable to restore GitHub scheduling. Keep manual dispatch. Revoke the dedicated credential only when the clock is retired. Preserve backup keys, copies and incident history.
 
 This changes the source of scheduled events. GitHub runner delays and provider outages remain possible. Existing independent absence alarms remain the guard for missing successful output.
