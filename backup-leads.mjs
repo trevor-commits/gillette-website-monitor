@@ -1,8 +1,8 @@
 // Private, finite D1 -> authenticated encryption -> approved Drive folder backup.
 import {createCipheriv,createDecipheriv,randomBytes,createHash} from 'node:crypto';
 import {gzipSync,gunzipSync} from 'node:zlib';
-import {readFileSync,writeFileSync,mkdirSync,mkdtempSync,rmSync,renameSync,statSync} from 'node:fs';
-import {join,resolve} from 'node:path';
+import {readFileSync,writeFileSync,mkdirSync,mkdtempSync,rmSync,renameSync,statSync,realpathSync} from 'node:fs';
+import {join,resolve,dirname,sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {execFile,execFileSync} from 'node:child_process';
 
@@ -35,7 +35,12 @@ export function d1SnapshotSql(schema){
     const target=identifier(table.name),name=literal(table.name);
     // Hex text preserves embedded NULs and Unicode; SQLite quote preserves
     // integer precision, NULL, real and blob literals without a JS conversion.
-    const cells=columns.map(identifier).map(c=>`CASE typeof(${c}) WHEN 'text' THEN 'CAST(X'''||hex(${c})||''' AS TEXT)' ELSE quote(${c}) END`);
+    const cells=columns.map(column=>{
+      // Redact in D1, before any row bytes reach a runner, local file or Drive.
+      if(table.name==='leads' && ['submitter_ip','submitter_ip_expires_at'].includes(column)) return literal('NULL');
+      const c=identifier(column);
+      return `CASE typeof(${c}) WHEN 'text' THEN 'CAST(X'''||hex(${c})||''' AS TEXT)' ELSE quote(${c}) END`;
+    });
     const row=literal(`INSERT INTO ${target} (${columns.map(identifier).join(',')}) VALUES (`)+"||"+cells.join("||','||")+"||');'";
     tables.push(name,`json_object('count',(SELECT CAST(count(*) AS TEXT) FROM ${target}),'rows',json((SELECT json_group_array(${row}) FROM ${target})))`);
   }
@@ -79,6 +84,20 @@ function privateRead(path){
   const s=statSync(path);if(!s.isFile()||(s.mode&0o077))throw Error('Private file permissions required');
   return readFileSync(path);
 }
+async function configuredSnapshot(config){
+  if(!config.cloudflareTokenFile)throw Error('Privacy-filtered export requires the approved D1 Read credential');
+  return exportD1Sql(config.cloudflareAccountId,config.cloudflareDatabaseId,privateRead(config.cloudflareTokenFile).toString());
+}
+function privateOutput(config,output){
+  const root=realpathSync(config.privateDirectory),parent=realpathSync(dirname(resolve(output)));
+  if((statSync(root).mode&0o077) || !(parent===root || parent.startsWith(root+sep)) || (statSync(parent).mode&0o077))throw Error('Output must remain inside the private backup directory');
+  return resolve(output);
+}
+export async function snapshot(configPath,output){
+  const config=JSON.parse(privateRead(configPath));
+  const target=privateOutput(config,output);
+  writeFileSync(target,await configuredSnapshot(config),{mode:0o600,flag:'wx'});
+}
 const hash=b=>createHash('sha256').update(b).digest('hex');
 const restorePython=`import sqlite3,sys,json
 db=sqlite3.connect(':memory:')
@@ -92,7 +111,7 @@ print(json.dumps({'integrity':'ok','leadRows':db.execute('SELECT count(*) FROM l
 export async function backup(configPath){
   process.umask(0o077);
   const config=JSON.parse(privateRead(configPath)),root=config.privateDirectory;
-  if(!root||!config.driveFolderId||config.expectedEmail!=='trevor@gillettewsc.com')throw Error('Reviewed backup configuration required');
+  if(!root||!config.driveFolderId||config.expectedEmail!=='trevor@gillettewsc.com'||!config.cloudflareTokenFile)throw Error('Reviewed privacy-filtered backup configuration required');
   mkdirSync(root,{recursive:true,mode:0o700});
   const key=privateRead(config.keyFile);if(key.length!==32)throw Error('Invalid recovery key');
   const ping=privateRead(config.heartbeatFile).toString().trim();
@@ -124,20 +143,7 @@ export async function backup(configPath){
     const folder=await driveRead('files/'+encodeURIComponent(config.driveFolderId)+'?fields=id,mimeType,permissions(type,role,emailAddress)');
     if(folder.mimeType!=='application/vnd.google-apps.folder'||folder.permissions?.length!==1||folder.permissions[0].role!=='owner'||folder.permissions[0].emailAddress!==config.expectedEmail)throw Error('Backup destination must remain private to business owner');
     const sqlPath=join(work,'leads.sql');
-    if(config.cloudflareTokenFile){
-      writeFileSync(sqlPath,await exportD1Sql(config.cloudflareAccountId,config.cloudflareDatabaseId,privateRead(config.cloudflareTokenFile).toString()),{mode:0o600});
-    }else{
-    const exportArgs=[join(config.repository,'node_modules/wrangler/bin/wrangler.js'),'d1','export','gillette-replacement-preview-leads','--remote','--config',join(config.repository,'wrangler.jsonc'),'--output',sqlPath,'--skip-confirmation'];
-    try{await run('read-only D1 export',process.execPath,exportArgs);}
-    catch(error){
-      // Wrangler refreshed its OAuth file but returned 401 on the first observed export.
-      // One bounded retry uses that existing refreshed credential; other failures stay failures.
-      if(!config.cloudflareOauthFile||!/Authentication error|Unauthorized/i.test(readFileSync(join(root,'last-command-error.log'),'utf8')))throw error;
-      const cfToken=/oauth_token\s*=\s*"([^"]+)"/.exec(privateRead(config.cloudflareOauthFile).toString())?.[1];
-      if(!cfToken)throw error;
-      await run('D1 export after credential refresh',process.execPath,exportArgs,{CLOUDFLARE_API_TOKEN:cfToken});
-    }
-    }
+    writeFileSync(sqlPath,await configuredSnapshot(config),{mode:0o600});
     const restored=JSON.parse(await run('isolated SQLite restore','/usr/bin/python3',['-c',restorePython,sqlPath]));
     const sql=readFileSync(sqlPath),bytes=seal(sql,key);
     const name='leads-'+new Date().toISOString().slice(0,19).replaceAll(':','-')+'Z.gwsc';
@@ -168,10 +174,12 @@ export async function backup(configPath){
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   try{
     if(process.argv[2]==='--restore'){
-      const config=JSON.parse(privateRead(process.argv[3])),output=process.argv[5];
-      if(!output||!output.startsWith(config.privateDirectory+'/'))throw Error('Restore output must be in the private backup directory');
+      const config=JSON.parse(privateRead(process.argv[3])),output=privateOutput(config,process.argv[5]);
       writeFileSync(output,unseal(privateRead(process.argv[4]),privateRead(config.keyFile)),{mode:0o600,flag:'wx'});
       console.log('Decrypted into private isolated restore file; production unchanged.');
+    }else if(process.argv[2]==='--snapshot'){
+      await snapshot(process.argv[3],process.argv[4]);
+      console.log('Privacy-filtered snapshot saved privately; production unchanged.');
     }else console.log(JSON.stringify(await backup(process.argv[2])));
   }catch{console.error('Website backup failed; inspect private last-run.json and independent warning.');process.exitCode=1;}
 }
