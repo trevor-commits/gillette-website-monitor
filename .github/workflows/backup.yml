@@ -55,6 +55,7 @@ jobs:
           CF_DATABASE: ${{ vars.GILLETTE_BACKUP_D1_DATABASE_ID }}
           DRIVE_FOLDER: ${{ vars.GILLETTE_BACKUP_DRIVE_FOLDER_ID }}
       - name: Export, encrypt, upload and independently verify
+        timeout-minutes: 4
         run: |
           node --input-type=module <<'JS'
           import {backup} from './backup-leads.mjs';

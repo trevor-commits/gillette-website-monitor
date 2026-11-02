@@ -27,3 +27,22 @@ The runner temporarily processes private inquiry SQL, checks an isolated in-memo
 Keep30days of exact timestamped snapshots. Older copies go to recoverable Drive Trash only after a verified replacement. The last verified Drive copy survives a failed run. A six-hour Healthchecks period plus two-hour grace warns independently after eight hours without a good backup; this protects the24-hour recovery-point target. Restores require the separately retained recovery key and an operator-controlled isolated application check; the recovery-time target is four hours. Run `forceFailure=true` only for one approved Trevor-only warning test, then dispatch a normal run and verify recovery. Missing-run warning remains required because GitHub schedules can be delayed or disabled after inactivity.
 
 October29 submission-IP privacy: the canonical exporter now replaces `leads.submitter_ip` and `leads.submitter_ip_expires_at` with SQL NULL inside the D1 SELECT, before private records leave Cloudflare. Customer answers, schema, counts and other tables remain intact. The legacy raw Wrangler/OAuth export fallback is removed; missing approved D1 Read configuration fails closed. Local release/monthly snapshots use the same filtered exporter through `--snapshot`; isolated decryption remains `--restore`. Do not restore the retired Mac schedule or expose metadata in logs. The site owns the regression fixtures and thirty-day active retention procedure.
+# November 1 reliability review
+
+The canonical website exporter now retries only one failed read on transport,
+HTTP429 or5xx, with a500ms pause and the existing30second per-request bound.
+Permanent authorization/SQL/schema/content failures still reject. Diagnostic
+output contains only HTTP status and bounded numeric API codes; no SQL, provider
+message, private record or credential. The website owns regression/SQLite tests;
+compare the canonical and copied exporter hashes before publication.
+
+Existing browser setup/probe steps now have2/3/3minute deadlines and report a
+failure through the existing independent browser capability even before probe
+startup. Temporary heartbeat files always clean up. The backup execution step
+has a4minute deadline inside its unchanged10minute job. Whole-job cancellation
+or absent runners still require the independent missing-output alarm. Both
+workflows remain manual-dispatch-only, driven by the same external clock; no
+new cron,monitor,recipient or permission scope. `npm run verify:checks` executes
+the actual warning-step code against safe destination/failure fixtures as well
+as the original clock regressions. Real hosted and natural runs remain separate
+acceptance gates; see the owning website reliability record.

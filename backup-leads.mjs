@@ -54,13 +54,30 @@ export async function exportD1Sql(accountId,databaseId,token){
   if(!/^[a-f0-9]{32}$/.test(accountId)||!/^[-a-f0-9]{36}$/.test(databaseId)||!token.trim())throw Error('Invalid D1 export configuration');
   const query=async sql=>{
     let response;
-    try{response=await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}/query`,{method:'POST',redirect:'error',headers:{authorization:'Bearer '+token.trim(),'content-type':'application/json'},body:JSON.stringify({sql,params:[]}),signal:AbortSignal.timeout(30000)});}
-    catch{throw Error('D1 read request failed');}
-    if(!response.ok||!response.body)throw Error('D1 read rejected');
+    // These are SELECTs only. Retry one transport/429/5xx failure, never a write,
+    // authorization rejection, malformed response, or rejected SQL statement.
+    for(let attempt=1;attempt<=2;attempt++) {
+      let reason='transport';
+      try{response=await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}/query`,{method:'POST',redirect:'error',headers:{authorization:'Bearer '+token.trim(),'content-type':'application/json'},body:JSON.stringify({sql,params:[]}),signal:AbortSignal.timeout(30000)});}
+      catch{if(attempt===2)throw Error('D1 read request failed');}
+      if(response) {
+        if(response.ok)break;
+        const status=response.status;await response.body?.cancel().catch(()=>{});
+        if(attempt===2 || (status!==429 && status<500))throw Error(`D1 read rejected (HTTP ${status})`);
+        reason=`http_${status}`;response=undefined;
+      }
+      console.warn('backup_d1_read_retry',{attempt,reason});
+      await new Promise(resolve=>setTimeout(resolve,500));
+    }
+    if(!response?.body)throw Error('D1 read response missing');
     const chunks=[];let size=0;
-    for await(const chunk of response.body){size+=chunk.length;if(size>64*1024*1024)throw Error('D1 read exceeds reviewed 64 MiB limit');chunks.push(chunk);}
+    try{for await(const chunk of response.body){size+=chunk.length;if(size>64*1024*1024)throw Error('D1 read exceeds reviewed 64 MiB limit');chunks.push(chunk);}}
+    catch{throw Error(size>64*1024*1024?'D1 read exceeds reviewed 64 MiB limit':'D1 response read failed');}
     let body;try{body=JSON.parse(Buffer.concat(chunks).toString());}catch{throw Error('Invalid D1 read response');}
-    if(!body.success||body.result?.length!==1||!body.result[0].success||!Array.isArray(body.result[0].results))throw Error('D1 read rejected');
+    if(!body?.success||body.result?.length!==1||!body.result[0]?.success||!Array.isArray(body.result[0].results)){
+      const codes=(Array.isArray(body?.errors)?body.errors:[]).filter(error=>Number.isSafeInteger(error?.code)&&error.code>=0&&error.code<=9999999).slice(0,5).map(error=>error.code);
+      throw Error(`D1 read rejected (HTTP ${response.status}${codes.length?'; codes '+codes.join(','):''})`);
+    }
     return body.result[0].results;
   };
   const schema=await query(d1SchemaSql);if(!schema.some(x=>x.type==='table'))throw Error('D1 schema missing');

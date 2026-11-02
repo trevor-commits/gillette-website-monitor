@@ -17,19 +17,25 @@ concurrency:
   cancel-in-progress: false
 jobs:
   browser:
-    if: github.ref == 'refs/heads/main' && ((github.event.schedule == '11 */6 * * *' && vars.GILLETTE_CLOCK_SOURCE != 'cloudflare') || (github.event_name == 'workflow_dispatch' && inputs.runBrowser))
+    if: github.repository == 'trevor-commits/gillette-website-monitor' && github.ref == 'refs/heads/main' && ((github.event.schedule == '11 */6 * * *' && vars.GILLETTE_CLOCK_SOURCE != 'cloudflare') || (github.event_name == 'workflow_dispatch' && inputs.runBrowser))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
       GILLETTE_PROBE_OWNER: github:trevor-commits/gillette-website-monitor
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '26'
           cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - name: Install browser packages
+        timeout-minutes: 2
+        run: npm ci
+      - name: Install browser runtime
+        timeout-minutes: 3
+        run: npx playwright install --with-deps chromium
       - name: Private heartbeat capability
         run: |
           export GILLETTE_BROWSER_HEARTBEAT_FILE="$RUNNER_TEMP/browser-ping"
@@ -37,4 +43,25 @@ jobs:
           echo "GILLETTE_BROWSER_HEARTBEAT_FILE=$GILLETTE_BROWSER_HEARTBEAT_FILE" >> "$GITHUB_ENV"
         env:
           PING_URL: ${{ secrets.HEALTHCHECKS_BROWSER_PING_URL }}
-      - run: node browser.mjs
+      - name: Run browser probe
+        timeout-minutes: 3
+        run: node browser.mjs
+      - name: Signal an independent failure
+        if: failure()
+        run: |
+          node --input-type=module <<'JS'
+          const ping=process.env.PING_URL;
+          if(!/^https:\/\/hc-ping\.com\/[0-9a-f-]{36}$/.test(ping||''))throw Error('Browser warning destination unavailable; missing-run deadline remains active');
+          const response=await fetch(ping+'/fail',{method:'POST',body:'hosted website browser check failed',signal:AbortSignal.timeout(15000)});
+          if(!response.ok)throw Error('Browser warning rejected; missing-run deadline remains active');
+          JS
+        env:
+          PING_URL: ${{ secrets.HEALTHCHECKS_BROWSER_PING_URL }}
+      - name: Remove this run's private heartbeat files
+        if: always()
+        run: |
+          node --input-type=module <<'JS'
+          import {rmSync} from 'node:fs';
+          import {join} from 'node:path';
+          for(const name of ['browser-ping','browser-last-run.json','browser-last-good.json'])rmSync(join(process.env.RUNNER_TEMP,name),{force:true});
+          JS
