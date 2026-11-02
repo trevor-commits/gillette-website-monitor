@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test": "npm run verify:checks",
     "check:http": "node http.mjs",
     "check:browser": "node browser.mjs",
     "verify:checks": "node --check http.mjs && node --check browser.mjs && node --check backup-leads.mjs && node --test workflow-clock.test.mjs workflow-health.test.mjs && npm audit --audit-level=moderate --fetch-timeout=15000 --fetch-retries=0"
