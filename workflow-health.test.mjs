@@ -32,3 +32,11 @@ test('bounded dependency and execution steps leave the warning/cleanup path with
     assert.ok(browser.includes(`- name: ${name}\n        timeout-minutes: ${limit}`),name);
   assert.match(backup,/- name: Export, encrypt, upload and independently verify\n        timeout-minutes: 4/);
 });
+test('browser setup avoids package mirrors while retaining runtime validation and failure reporting',()=>{
+  const source=workflow('monitor');
+  const setup=source.slice(source.indexOf('      - name: Install browser runtime\n'),source.indexOf('      - name: Private heartbeat capability\n'));
+  assert.doesNotMatch(setup,/--with-deps|\binstall-deps\b|\bapt(?:-get)?\b/,'runner libraries must not trigger mirror-dependent font installation');
+  assert.match(setup,/run: npx playwright install chromium\n/);
+  assert.match(source,/- name: Run browser probe\n        timeout-minutes: 3\n        run: node browser\.mjs/,'the real browser must still launch and validate its dependencies');
+  assert.match(source,/- name: Signal an independent failure\n        if: failure\(\)/);
+});

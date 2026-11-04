@@ -35,7 +35,7 @@ jobs:
         run: npm ci
       - name: Install browser runtime
         timeout-minutes: 3
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
       - name: Private heartbeat capability
         run: |
           export GILLETTE_BROWSER_HEARTBEAT_FILE="$RUNNER_TEMP/browser-ping"

@@ -46,3 +46,28 @@ new cron,monitor,recipient or permission scope. `npm run verify:checks` executes
 the actual warning-step code against safe destination/failure fixtures as well
 as the original clock regressions. Real hosted and natural runs remain separate
 acceptance gates; see the owning website reliability record.
+
+## November 3 browser runtime installation repair
+
+Natural run41691353277 never reached the browser probe: the three-minute runtime
+installation deadline expired while `playwright install --with-deps chromium`
+downloaded and unpacked fonts through Ubuntu's package mirror. Its log reports
+the browser shared libraries already installed; the extra21.1MB font download
+took166seconds. The existing failure signal succeeded and cleanup ran. Later
+natural runs recovered, which does not repair this avoidable setup dependency.
+
+The same job now runs `playwright install chromium`, reusing the hosted Ubuntu
+image's libraries and downloading the pinned Playwright browser. No package
+mirror refresh or optional font installation precedes the actual probe. Required
+launch/dependency checks remain in `browser.mjs`; a missing library still fails
+the probe and reaches the existing independent alarm. The same three-minute
+step/probe deadlines, ten-minute job, private cleanup, permissions, external
+six-hour clock and single care owner remain unchanged. No application deployment.
+
+The new workflow regression failed on the old installer and passes with the
+existing clock/warning tests (11total). A corrective existing-workflow run must
+verify real Linux installation, zero-submit browser outcomes and accepted
+independent acknowledgment. Subsequent natural execution is separate evidence.
+Revalidate after runner-image or Playwright changes. Rollback restores only the
+runtime install line from4c76dec; never disable warnings or extend deadlines to
+hide a dependency failure. The mirror's low throughput itself is provider-owned.
