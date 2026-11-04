@@ -65,9 +65,12 @@ step/probe deadlines, ten-minute job, private cleanup, permissions, external
 six-hour clock and single care owner remain unchanged. No application deployment.
 
 The new workflow regression failed on the old installer and passes with the
-existing clock/warning tests (11total). A corrective existing-workflow run must
-verify real Linux installation, zero-submit browser outcomes and accepted
-independent acknowledgment. Subsequent natural execution is separate evidence.
+existing clock/warning tests (11total). Corrective existing-workflow run41787566680
+on sourcee5b22cc completed November4 at06:45:13UTC. Runtime installation took
+nine seconds without apt; the real browser reported failures[],leadPosts0,
+readiness200 and an accepted independent acknowledgment. Private-file cleanup
+and post-job cleanup succeeded. This is manual original-path repair proof;
+subsequent natural execution is separate evidence.
 Revalidate after runner-image or Playwright changes. Rollback restores only the
 runtime install line from4c76dec; never disable warnings or extend deadlines to
 hide a dependency failure. The mirror's low throughput itself is provider-owned.
