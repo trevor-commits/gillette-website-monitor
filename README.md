@@ -12,6 +12,37 @@ Inspect the Better Stack incident timeline, Actions logs, Healthchecks history a
 
 ## Encrypted backup operations
 
+### November 5: remove the stalled package-mirror dependency
+
+Owner: the existing adaptive site-care chat, reusing this checkout and main.
+Integration target: remote main. Exit: normal publication gates and a completed
+original hosted backup with independent integrity/schema verification and cleanup.
+The following natural clock occurrence remains separate acceptance evidence.
+
+Natural run [42175927251](https://github.com/trevor-commits/gillette-website-monitor/actions/runs/42175927251)
+never exported data: Ubuntu's mirror stalled downloading the16.5MB rclone package
+until the existing three-minute installation deadline expired. Package-index
+refresh had completed in seconds. The independent failure signal and cleanup ran.
+
+Setup now downloads official [rclone1.75.2](https://rclone.org/downloads/), pinned
+to its versioned Linux-amd64 archive and the exact SHA256 from the vendor's
+[release checksums](https://downloads.rclone.org/v1.75.2/SHA256SUMS). HTTPS-only
+redirects, bounded transfer/retries and checksum verification precede extraction
+and execution. The binary lives in this job's private temporary directory; both
+it and backup capabilities are removed by the existing always-cleanup step.
+No global package installation or Ubuntu mirror is needed. The three-minute
+setup, four-minute export, ten-minute job, failure signal, read-only Cloudflare
+credential, existing Drive scope, encryption/redaction and six-hour clock remain.
+
+The real shell installer is exercised offline with a harmless archive: valid
+bytes execute, corrupted bytes and failed transfers stop before execution, and
+the downloaded archive is removed on every exit. Use portable `sha256sum -c -`
+so the same check runs on the development Mac and Ubuntu. All12 local checks and
+the dependency audit pass. Revalidate the checksum, installer and actual hosted
+upload/download after changing the pinned release, runner architecture or path.
+Rollback restores only this installer/path/cleanup change from62a1a9e, retaining
+existing private state, prior good backups, schedules and independent alarms.
+
 The repaired installer passed [manual verification 41271915226](https://github.com/trevor-commits/gillette-website-monitor/actions/runs/41271915226) on source `d2938d7`: nine-second install, twenty-four-second job, encrypted upload/independent download, integrity/schema pass, zero notifications, no live database changes, and successful private-file cleanup. The next natural clock slot at `2026-11-01T06:40:00Z` remains pending. Its actual clock event and first attempt must be checked separately; do not count this manual run as natural execution proof.
 
 October 31 dependency-install repair: the first attempt of [run 41257767350](https://github.com/trevor-commits/gillette-website-monitor/actions/runs/41257767350/attempts/1) exhausted the ten-minute job while Ubuntu mirror downloads stalled. No export ran, and job cancellation skipped the failure signal. The recovered second attempt passed. Installation now has two download retries, fifteen-second HTTP/HTTPS timeouts, and a three-minute step deadline inside the unchanged ten-minute job. This bounds a stalled install and leaves time for the existing failure signal and cleanup; it does not guarantee mirror availability. Local shell syntax and success/update-failure/install-failure checks pass, as do the existing seven clock tests and dependency audit. Schedules, secrets, backup code, retention, and absence deadlines are unchanged. A fresh hosted success and the next natural clock slot remain separate acceptance checks.
