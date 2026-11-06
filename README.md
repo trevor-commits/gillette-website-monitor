@@ -43,6 +43,17 @@ upload/download after changing the pinned release, runner architecture or path.
 Rollback restores only this installer/path/cleanup change from62a1a9e, retaining
 existing private state, prior good backups, schedules and independent alarms.
 
+Original-path recovery is verified by existing-workflow run
+[42177073897](https://github.com/trevor-commits/gillette-website-monitor/actions/runs/42177073897)
+on source `dbb6764839549096e5f8c5af39f25f890dcdeacb`, completed
+2026-11-06T06:51:38UTC. Checksum/version verification and installation took two
+seconds; the full job took nineteen. The encrypted upload and independent
+download passed integrity/schema checks with zero notifications, no live
+database modification, an accepted independent heartbeat and successful private
+file/tool cleanup. This is a corrective manual recovery after the failed natural
+06:40 run. The next existing natural12:40UTC slot remains separate evidence;
+no additional schedule, monitor or model wake was created to observe it.
+
 The repaired installer passed [manual verification 41271915226](https://github.com/trevor-commits/gillette-website-monitor/actions/runs/41271915226) on source `d2938d7`: nine-second install, twenty-four-second job, encrypted upload/independent download, integrity/schema pass, zero notifications, no live database changes, and successful private-file cleanup. The next natural clock slot at `2026-11-01T06:40:00Z` remains pending. Its actual clock event and first attempt must be checked separately; do not count this manual run as natural execution proof.
 
 October 31 dependency-install repair: the first attempt of [run 41257767350](https://github.com/trevor-commits/gillette-website-monitor/actions/runs/41257767350/attempts/1) exhausted the ten-minute job while Ubuntu mirror downloads stalled. No export ran, and job cancellation skipped the failure signal. The recovered second attempt passed. Installation now has two download retries, fifteen-second HTTP/HTTPS timeouts, and a three-minute step deadline inside the unchanged ten-minute job. This bounds a stalled install and leaves time for the existing failure signal and cleanup; it does not guarantee mirror availability. Local shell syntax and success/update-failure/install-failure checks pass, as do the existing seven clock tests and dependency audit. Schedules, secrets, backup code, retention, and absence deadlines are unchanged. A fresh hosted success and the next natural clock slot remain separate acceptance checks.
