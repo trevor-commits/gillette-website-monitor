@@ -116,3 +116,9 @@ subsequent natural execution is separate evidence.
 Revalidate after runner-image or Playwright changes. Rollback restores only the
 runtime install line from4c76dec; never disable warnings or extend deadlines to
 hide a dependency failure. The mirror's low throughput itself is provider-owned.
+
+## November 8 explicit browser activation follow-through
+
+The website source `7da24e28aa6a19597103470c9f16d859c9ebca2d` adds an explicit first-name click before synthetic filling. This follows the same real interaction that starts lazy verification. The local original probe reported address/security failures; the instrumented clicked run and the updated normal probe passed. A broken HTTP200 security script and blocked Maps provider still fail their original checks, with zero lead submissions. Original failures remain retained by the website release task; this does not establish a permanent external-provider repair.
+
+`browser.mjs` is byte-identical to the tested website source. All checks, case/provider deadlines, independent signals, secrets and existing workflow-clock routes remain governed by their current contracts. No workflow dispatch or new schedule is part of this source sync. The next naturally scheduled hosted run must provide its own execution and heartbeat receipt; source publication and local acceptance do not prove that future result. Sole ongoing care remains with the existing adaptive-site owner. Rollback is an ordinary revert of this one probe interaction after reviewing actual provider evidence.

@@ -52,6 +52,7 @@ try {
   if(!await page.locator('#quote-form button[type=submit]').isEnabled())result.failures.push('form_script');
   await page.locator('.service-options input').first().check();
   if(await page.locator('#service-count').textContent()!=='1 service selected')result.failures.push('form_script');
+  await page.locator('[name=firstName]').click();
   await page.locator('[name=firstName]').fill('Synthetic monitor; not submitted');
   await page.locator('[name=firstName]').press('Tab');
   await page.locator('#address').fill('Sacramento City Hall');
